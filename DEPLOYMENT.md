@@ -52,13 +52,19 @@ git push -u origin main
 
 1. [Vercel](https://vercel.com)にログイン
 2. 「Add New...」→「Project」を選択
-3. GitHubリポジトリを選択
-4. プロジェクト設定：
-   - **Framework Preset**: Next.js
-   - **Root Directory**: `nextjs-app`
+3. GitHubリポジトリ「LP-Design-Support」を選択
+4. **プロジェクト設定（重要）**：
+   - **Framework Preset**: Next.js（自動検出されるはずですが、手動で選択）
+   - **Root Directory**: `nextjs-app` **（必ず設定してください）**
+     - 「Edit」をクリック
+     - 「Root Directory」を選択
+     - `nextjs-app`と入力
+     - 「Continue」をクリック
    - **Build Command**: `npm run build`（自動検出）
    - **Output Directory**: `.next`（自動検出）
    - **Install Command**: `npm install`（自動検出）
+
+**重要**: Root Directoryを`nextjs-app`に設定しないと、`package.json`が見つからずエラーになります。
 
 ### 2.2 環境変数の設定
 

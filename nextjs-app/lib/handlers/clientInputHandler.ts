@@ -60,11 +60,13 @@ interface ClientInputData {
   // 生成されたLPコピー
   generated_copy?: any;
   finalized_copy?: any;
+  finalized_copy_at?: string;
   // デザイン指示
   design_instruction?: any;
   design_instruction_generated_at?: string;
   finalized_design_instruction?: any;
   finalized_design_instruction_at?: string;
+  project_folder_id?: string;
   created_at?: string;
   updated_at?: string;
 }

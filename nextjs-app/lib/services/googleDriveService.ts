@@ -18,16 +18,28 @@ export class GoogleDriveService {
 
   constructor() {
     const credentialsPath = process.env.GOOGLE_DRIVE_CREDENTIALS_PATH;
+    const credentialsJson = process.env.GOOGLE_DRIVE_CREDENTIALS_JSON;
     const tokenPath = process.env.GOOGLE_DRIVE_TOKEN_PATH;
+    const tokenJson = process.env.GOOGLE_DRIVE_TOKEN_JSON;
     this.rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || null;
 
-    if (!credentialsPath) {
-      throw new Error('GOOGLE_DRIVE_CREDENTIALS_PATHが設定されていません');
+    if (!credentialsPath && !credentialsJson) {
+      throw new Error('GOOGLE_DRIVE_CREDENTIALS_PATHまたはGOOGLE_DRIVE_CREDENTIALS_JSONが設定されていません');
     }
 
     try {
-      // credentials.jsonを読み込む
-      const credentialsContent = fs.readFileSync(credentialsPath, 'utf8');
+      // credentials.jsonを読み込む（環境変数またはファイルから）
+      let credentialsContent: string;
+      if (credentialsJson) {
+        // Vercelなど、環境変数から直接読み込む場合
+        credentialsContent = credentialsJson;
+      } else if (credentialsPath) {
+        // ローカル環境など、ファイルパスから読み込む場合
+        credentialsContent = fs.readFileSync(credentialsPath, 'utf8');
+      } else {
+        throw new Error('認証情報の取得方法が指定されていません');
+      }
+      
       const credentials = JSON.parse(credentialsContent);
 
       // JWT認証を使用（サービスアカウントまたはOAuth2クライアント）
@@ -48,10 +60,23 @@ export class GoogleDriveService {
         const redirectUri = Array.isArray(redirect_uris) ? redirect_uris[0] : redirect_uris;
         const oAuth2Client = new OAuth2Client(client_id, client_secret, redirectUri);
 
-        // トークンが存在する場合は読み込む
-        if (tokenPath && fs.existsSync(tokenPath)) {
+        // トークンが存在する場合は読み込む（環境変数またはファイルから）
+        let token: any = null;
+        if (tokenJson) {
+          // Vercelなど、環境変数から直接読み込む場合
           try {
-            const token = JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
+            token = JSON.parse(tokenJson);
+            oAuth2Client.setCredentials(token);
+            this.auth = oAuth2Client as any;
+          } catch (tokenError) {
+            throw new Error(
+              `トークンの解析に失敗しました: ${tokenError instanceof Error ? tokenError.message : String(tokenError)}`
+            );
+          }
+        } else if (tokenPath && fs.existsSync(tokenPath)) {
+          // ローカル環境など、ファイルパスから読み込む場合
+          try {
+            token = JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
             oAuth2Client.setCredentials(token);
             this.auth = oAuth2Client as any;
           } catch (tokenError) {
@@ -62,10 +87,16 @@ export class GoogleDriveService {
         } else {
           throw new Error(
             'OAuth2トークンが見つかりません。初回認証が必要です。\n' +
-            'GOOGLE_DRIVE_TOKEN_PATHを設定するか、認証フローを実行してください。\n' +
-            `設定されたパス: ${tokenPath || '未設定'}`
+            'GOOGLE_DRIVE_TOKEN_JSONまたはGOOGLE_DRIVE_TOKEN_PATHを設定するか、認証フローを実行してください。\n' +
+            `設定されたパス: ${tokenPath || '未設定'}\n` +
+            `環境変数: ${tokenJson ? '設定済み' : '未設定'}`
           );
         }
+      }
+
+      // this.authがnullでないことを確認
+      if (!this.auth) {
+        throw new Error('認証情報の初期化に失敗しました');
       }
 
       // Google Drive APIとGoogle Docs APIを初期化

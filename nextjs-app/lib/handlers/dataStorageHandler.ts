@@ -2,17 +2,25 @@ import { GoogleDriveService } from '@/lib/services/googleDriveService';
 import { ProjectNumberManager } from '@/lib/utils/projectNumberManager';
 
 export interface ClientInputData {
-  project_id: string;
-  basic_info: any;
-  target_info: any;
-  value_proposition: any;
-  benefits: any;
-  social_proof: any;
-  competitor_info: any;
-  brand_info: any;
-  lp_goals: any;
+  project_id?: string;
+  basic_info?: any;
+  target_info?: any;
+  value_proposition?: any;
+  benefits?: any;
+  social_proof?: any;
+  competitor_info?: any;
+  brand_info?: any;
+  lp_goals?: any;
   ai_analysis?: any;
   ai_questions?: any;
+  generated_copy?: any;
+  finalized_copy?: any;
+  finalized_copy_at?: string;
+  design_instruction?: any;
+  design_instruction_generated_at?: string;
+  finalized_design_instruction?: any;
+  finalized_design_instruction_at?: string;
+  project_folder_id?: string;
   created_at?: string;
   updated_at?: string;
 }

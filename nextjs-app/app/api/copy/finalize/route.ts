@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const handler = new ClientInputHandler();
     const result = await handler.updateInput(projectId, {
       finalized_copy: copy,
-      finalized_at: new Date().toISOString(),
+      finalized_copy_at: new Date().toISOString(),
     });
 
     if (!result.success) {

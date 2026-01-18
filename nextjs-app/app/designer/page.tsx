@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { 
@@ -46,7 +46,7 @@ const purposeOptions = [
   { value: 'other', label: 'その他' },
 ];
 
-export default function DesignerPage() {
+function DesignerPageContent() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -776,5 +776,17 @@ export default function DesignerPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function DesignerPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      </div>
+    }>
+      <DesignerPageContent />
+    </Suspense>
   );
 }

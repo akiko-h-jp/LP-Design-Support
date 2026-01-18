@@ -1,9 +1,8 @@
 import NextAuth from 'next-auth';
-import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 
-export const authOptions: NextAuthOptions = {
+export const authOptions = {
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -15,6 +14,9 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
+
+        const email = credentials.email as string;
+        const password = credentials.password as string;
 
         const adminEmail = process.env.ADMIN_EMAIL;
         let adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
@@ -34,12 +36,12 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        if (credentials.email !== adminEmail) {
+        if (email !== adminEmail) {
           return null;
         }
         
         const isPasswordValid = await bcrypt.compare(
-          credentials.password,
+          password,
           adminPasswordHash
         );
 
@@ -59,17 +61,17 @@ export const authOptions: NextAuthOptions = {
     signIn: '/login',
   },
   session: {
-    strategy: 'jwt',
+    strategy: 'jwt' as const,
     maxAge: 30 * 24 * 60 * 60, // 30日
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: any) {
       if (user) {
         token.email = user.email;
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (session.user) {
         session.user.email = token.email as string;
       }
