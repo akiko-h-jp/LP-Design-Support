@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 interface ProjectNumberRecord {
   project_id: string;
@@ -13,7 +14,18 @@ interface ProjectNumbersData {
   records: ProjectNumberRecord[];
 }
 
-const PROJECT_NUMBERS_FILE = path.join(process.cwd(), 'project_numbers.json');
+// Vercelでは/tmpディレクトリを使用（一時的なファイルシステム）
+// ローカル環境ではprocess.cwd()を使用
+const getProjectNumbersFilePath = (): string => {
+  // Vercel環境では/tmpディレクトリを使用
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    return path.join(os.tmpdir(), 'project_numbers.json');
+  }
+  // ローカル環境ではプロジェクトルートを使用
+  return path.join(process.cwd(), 'project_numbers.json');
+};
+
+const PROJECT_NUMBERS_FILE = getProjectNumbersFilePath();
 
 export class ProjectNumberManager {
   private data: ProjectNumbersData = { records: [] };
@@ -48,10 +60,20 @@ export class ProjectNumberManager {
    */
   private saveRecords(): void {
     try {
+      // ディレクトリが存在しない場合は作成
+      const dir = path.dirname(PROJECT_NUMBERS_FILE);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
       fs.writeFileSync(PROJECT_NUMBERS_FILE, JSON.stringify(this.data, null, 2), 'utf8');
     } catch (error) {
       console.error('案件番号ファイルの保存エラー:', error);
-      throw new Error('案件番号の保存に失敗しました');
+      // Vercel環境では一時的なファイルシステムのため、エラーを無視する
+      if (process.env.VERCEL) {
+        console.warn('Vercel環境では案件番号の永続化はできません。メモリ内のみで動作します。');
+      } else {
+        throw new Error('案件番号の保存に失敗しました');
+      }
     }
   }
 

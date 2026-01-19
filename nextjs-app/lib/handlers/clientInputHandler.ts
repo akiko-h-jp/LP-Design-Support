@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 
 interface ClientInputData {
   project_id?: string;
@@ -83,7 +84,13 @@ export class ClientInputHandler {
   private tempStorageDir: string;
 
   constructor() {
-    this.tempStorageDir = path.join(process.cwd(), 'temp_client_inputs');
+    // Vercel環境では/tmpディレクトリを使用（一時的なファイルシステム）
+    // ローカル環境ではprocess.cwd()を使用
+    if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+      this.tempStorageDir = path.join(os.tmpdir(), 'temp_client_inputs');
+    } else {
+      this.tempStorageDir = path.join(process.cwd(), 'temp_client_inputs');
+    }
     this.ensureTempDir();
   }
 
@@ -92,6 +99,10 @@ export class ClientInputHandler {
       await fs.mkdir(this.tempStorageDir, { recursive: true });
     } catch (error) {
       console.error('Failed to create temp directory:', error);
+      // Vercel環境では一時的なファイルシステムのため、エラーを無視する
+      if (process.env.VERCEL) {
+        console.warn('Vercel環境では一時ディレクトリの作成に失敗しました。メモリ内のみで動作します。');
+      }
     }
   }
 
