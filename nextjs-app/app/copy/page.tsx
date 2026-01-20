@@ -55,54 +55,70 @@ function CopyPageContent() {
 
   // コピーデータの検証と正規化
   const validateAndNormalizeCopy = (copyData: any): LPCopy | null => {
-    if (!copyData) return null;
+    if (!copyData) {
+      console.warn('[CopyPage] copyData is null or undefined');
+      return null;
+    }
 
     try {
-      // 基本的な構造を確認
-      if (!copyData.hero || !copyData.problem || !copyData.solution || !copyData.benefits || !copyData.cta) {
-        console.warn('[CopyPage] Invalid copy data structure:', copyData);
-        return null;
+      console.log('[CopyPage] Validating copy data:', JSON.stringify(copyData, null, 2));
+      
+      // データが文字列の場合はJSONパースを試みる
+      let parsedData = copyData;
+      if (typeof copyData === 'string') {
+        try {
+          parsedData = JSON.parse(copyData);
+        } catch (parseError) {
+          console.error('[CopyPage] Failed to parse copy data as JSON:', parseError);
+          return null;
+        }
       }
 
-      // 各セクションの必須フィールドを検証・補完
+      // 基本的な構造を確認（必須フィールドが存在しない場合はデフォルト値を設定）
       const normalized: LPCopy = {
-        hero: {
-          headline: copyData.hero?.headline || 'キャッチコピーを追加してください',
-          subheadline: copyData.hero?.subheadline || 'サブキャッチコピーを追加してください',
-          supportText: copyData.hero?.supportText || '補足説明を追加してください',
-        },
-        problem: {
-          title: copyData.problem?.title || '課題のタイトルを追加してください',
-          description: copyData.problem?.description || '課題の説明を追加してください',
-        },
-        solution: {
-          title: copyData.solution?.title || '解決策のタイトルを追加してください',
-          description: copyData.solution?.description || '解決策の説明を追加してください',
-        },
-        benefits: Array.isArray(copyData.benefits) && copyData.benefits.length > 0
-          ? copyData.benefits.map((b: any) => ({
-              title: b.title || 'メリットタイトル',
-              description: b.description || 'メリット説明',
-            }))
-          : [
-              { title: 'メリット1', description: '内容を追加してください' },
-              { title: 'メリット2', description: '内容を追加してください' },
-              { title: 'メリット3', description: '内容を追加してください' },
-            ],
-        socialProof: {
-          title: copyData.socialProof?.title || '実績・社会証明のタイトルを追加してください',
-          content: copyData.socialProof?.content || '実績・社会証明の内容を追加してください',
-        },
-        cta: {
-          primary: copyData.cta?.primary || 'CTAを追加してください',
-          secondary: copyData.cta?.secondary,
-        },
-        editingNotes: copyData.editingNotes,
+        hero: parsedData.hero || {},
+        problem: parsedData.problem || {},
+        solution: parsedData.solution || {},
+        benefits: Array.isArray(parsedData.benefits) ? parsedData.benefits : [],
+        socialProof: parsedData.socialProof || {},
+        cta: parsedData.cta || {},
+        editingNotes: parsedData.editingNotes,
       };
 
+      // 各セクションの必須フィールドを検証・補完
+      if (!normalized.hero.headline) normalized.hero.headline = 'キャッチコピーを追加してください';
+      if (!normalized.hero.subheadline) normalized.hero.subheadline = 'サブキャッチコピーを追加してください';
+      if (!normalized.hero.supportText) normalized.hero.supportText = '補足説明を追加してください';
+
+      if (!normalized.problem.title) normalized.problem.title = '課題のタイトルを追加してください';
+      if (!normalized.problem.description) normalized.problem.description = '課題の説明を追加してください';
+
+      if (!normalized.solution.title) normalized.solution.title = '解決策のタイトルを追加してください';
+      if (!normalized.solution.description) normalized.solution.description = '解決策の説明を追加してください';
+
+      if (normalized.benefits.length === 0) {
+        normalized.benefits = [
+          { title: 'メリット1', description: '内容を追加してください' },
+          { title: 'メリット2', description: '内容を追加してください' },
+          { title: 'メリット3', description: '内容を追加してください' },
+        ];
+      } else {
+        normalized.benefits = normalized.benefits.map((b: any) => ({
+          title: b.title || 'メリットタイトル',
+          description: b.description || 'メリット説明',
+        }));
+      }
+
+      if (!normalized.socialProof.title) normalized.socialProof.title = '実績・社会証明のタイトルを追加してください';
+      if (!normalized.socialProof.content) normalized.socialProof.content = '実績・社会証明の内容を追加してください';
+
+      if (!normalized.cta.primary) normalized.cta.primary = 'CTAを追加してください';
+
+      console.log('[CopyPage] Normalized copy data:', JSON.stringify(normalized, null, 2));
       return normalized;
     } catch (error) {
       console.error('[CopyPage] Error validating copy data:', error);
+      console.error('[CopyPage] Error details:', error instanceof Error ? error.stack : String(error));
       return null;
     }
   };
