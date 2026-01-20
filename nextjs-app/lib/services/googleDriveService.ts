@@ -33,6 +33,10 @@ export class GoogleDriveService {
       if (credentialsJson) {
         // Vercelなど、環境変数から直接読み込む場合
         credentialsContent = credentialsJson;
+        // JSONの検証（デバッグ用）
+        console.log('[GoogleDriveService] Credentials JSON length:', credentialsContent.length);
+        console.log('[GoogleDriveService] Credentials JSON first 100 chars:', credentialsContent.substring(0, 100));
+        console.log('[GoogleDriveService] Credentials JSON last 100 chars:', credentialsContent.substring(Math.max(0, credentialsContent.length - 100)));
       } else if (credentialsPath) {
         // ローカル環境など、ファイルパスから読み込む場合
         credentialsContent = fs.readFileSync(credentialsPath, 'utf8');
@@ -40,7 +44,24 @@ export class GoogleDriveService {
         throw new Error('認証情報の取得方法が指定されていません');
       }
       
-      const credentials = JSON.parse(credentialsContent);
+      let credentials: any;
+      try {
+        credentials = JSON.parse(credentialsContent);
+      } catch (parseError) {
+        console.error('[GoogleDriveService] JSON parse error at position:', parseError instanceof SyntaxError ? (parseError as any).message : String(parseError));
+        console.error('[GoogleDriveService] JSON content length:', credentialsContent.length);
+        // エラー位置の前後の文字を表示
+        if (parseError instanceof SyntaxError) {
+          const match = parseError.message.match(/position (\d+)/);
+          if (match) {
+            const position = parseInt(match[1], 10);
+            const start = Math.max(0, position - 50);
+            const end = Math.min(credentialsContent.length, position + 50);
+            console.error('[GoogleDriveService] JSON around error position:', credentialsContent.substring(start, end));
+          }
+        }
+        throw new Error(`認証情報のJSON解析に失敗しました: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+      }
 
       // JWT認証を使用（サービスアカウントまたはOAuth2クライアント）
       if (credentials.type === 'service_account') {
