@@ -335,17 +335,37 @@ export class GoogleDriveService {
 
   /**
    * ファイルをエクスポート（JSON形式など）
+   * Google Docsファイルの場合は、exportメソッドを使用
    */
   async exportFile(fileId: string, mimeType: string = 'text/plain'): Promise<string> {
     try {
-      const response = await this.drive.files.get({
+      // まずファイルのメタデータを取得してMIMEタイプを確認
+      const fileMetadata = await this.drive.files.get({
         fileId: fileId,
-        alt: 'media',
-      }, {
-        responseType: 'text',
+        fields: 'mimeType',
       });
 
-      return response.data as string;
+      const fileMimeType = fileMetadata.data.mimeType;
+
+      // Google Docsファイルの場合はexportメソッドを使用
+      if (fileMimeType === 'application/vnd.google-apps.document') {
+        const response = await this.drive.files.export({
+          fileId: fileId,
+          mimeType: mimeType,
+        }, {
+          responseType: 'text',
+        });
+        return response.data as string;
+      } else {
+        // 通常のファイルの場合は直接ダウンロード
+        const response = await this.drive.files.get({
+          fileId: fileId,
+          alt: 'media',
+        }, {
+          responseType: 'text',
+        });
+        return response.data as string;
+      }
     } catch (error) {
       console.error('ファイルエクスポートエラー:', error);
       throw new Error(

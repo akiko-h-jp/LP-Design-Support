@@ -653,8 +653,15 @@ export class DataStorageHandler {
 
           if (jsonFile) {
             try {
-              // JSONファイルの内容を読み込む
-              const jsonContent = await this.driveService.readDocument(jsonFile.id);
+              // JSONファイルの内容を読み込む（Google Docsファイルとして保存されている場合はエクスポート）
+              let jsonContent: string;
+              if (jsonFile.mimeType === 'application/vnd.google-apps.document') {
+                // Google Docsファイルの場合はエクスポート
+                jsonContent = await this.driveService.exportFile(jsonFile.id, 'text/plain');
+              } else {
+                // 通常のファイルの場合は直接読み込み
+                jsonContent = await this.driveService.readDocument(jsonFile.id);
+              }
               const projectData = JSON.parse(jsonContent) as ClientInputData;
 
               // プロジェクトIDが存在しない場合は、案件番号から推測
@@ -740,8 +747,15 @@ export class DataStorageHandler {
 
       if (jsonFile) {
         try {
-          // JSONファイルの内容を読み込む
-          const jsonContent = await this.driveService.readDocument(jsonFile.id);
+          // JSONファイルの内容を読み込む（Google Docsファイルとして保存されている場合はエクスポート）
+          let jsonContent: string;
+          if (jsonFile.mimeType === 'application/vnd.google-apps.document') {
+            // Google Docsファイルの場合はエクスポート
+            jsonContent = await this.driveService.exportFile(jsonFile.id, 'text/plain');
+          } else {
+            // 通常のファイルの場合は直接読み込み
+            jsonContent = await this.driveService.readDocument(jsonFile.id);
+          }
           const projectData = JSON.parse(jsonContent) as ClientInputData;
 
           // プロジェクトIDとフォルダIDを設定
