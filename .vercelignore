@@ -1,0 +1,10 @@
+node_modules
+.next
+.env.local
+.env
+*.log
+.DS_Store
+temp_client_inputs
+project_numbers.json
+credentials.json
+token.json

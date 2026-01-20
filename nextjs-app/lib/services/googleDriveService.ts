@@ -236,4 +236,121 @@ export class GoogleDriveService {
       );
     }
   }
+
+  /**
+   * Google Docsファイルの内容を読み込む
+   */
+  async readDocument(fileId: string): Promise<string> {
+    try {
+      const document = await this.docs.documents.get({
+        documentId: fileId,
+      });
+
+      if (!document.data.body || !document.data.body.content) {
+        return '';
+      }
+
+      // ドキュメントの内容をテキストに変換
+      let text = '';
+      const extractText = (element: any): string => {
+        if (element.textRun) {
+          return element.textRun.content || '';
+        }
+        if (element.paragraph && element.paragraph.elements) {
+          return element.paragraph.elements
+            .map((e: any) => extractText(e))
+            .join('');
+        }
+        if (element.table) {
+          // テーブルの場合は簡略化
+          return '';
+        }
+        return '';
+      };
+
+      for (const element of document.data.body.content) {
+        text += extractText(element);
+      }
+
+      return text;
+    } catch (error) {
+      console.error('ドキュメント読み込みエラー:', error);
+      throw new Error(
+        `ドキュメント読み込みに失敗しました: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * フォルダ内のファイル一覧を取得
+   */
+  async listFilesInFolder(folderId: string): Promise<Array<{ id: string; name: string; mimeType: string }>> {
+    try {
+      const response = await this.drive.files.list({
+        q: `'${folderId}' in parents and trashed=false`,
+        fields: 'files(id, name, mimeType)',
+        pageSize: 100,
+      });
+
+      return response.data.files || [];
+    } catch (error) {
+      console.error('ファイル一覧取得エラー:', error);
+      throw new Error(
+        `ファイル一覧取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * プロジェクトフォルダ一覧を取得（ルートフォルダ内のフォルダ一覧）
+   */
+  async listProjectFolders(): Promise<Array<{ id: string; name: string; createdTime: string; modifiedTime: string }>> {
+    try {
+      let query = "mimeType='application/vnd.google-apps.folder' and trashed=false";
+      
+      if (this.rootFolderId) {
+        query += ` and '${this.rootFolderId}' in parents`;
+      }
+
+      const response = await this.drive.files.list({
+        q: query,
+        fields: 'files(id, name, createdTime, modifiedTime)',
+        orderBy: 'modifiedTime desc',
+        pageSize: 100,
+      });
+
+      return (response.data.files || []).map((file: any) => ({
+        id: file.id,
+        name: file.name,
+        createdTime: file.createdTime || '',
+        modifiedTime: file.modifiedTime || '',
+      }));
+    } catch (error) {
+      console.error('プロジェクトフォルダ一覧取得エラー:', error);
+      throw new Error(
+        `プロジェクトフォルダ一覧取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * ファイルをエクスポート（JSON形式など）
+   */
+  async exportFile(fileId: string, mimeType: string = 'text/plain'): Promise<string> {
+    try {
+      const response = await this.drive.files.get({
+        fileId: fileId,
+        alt: 'media',
+      }, {
+        responseType: 'text',
+      });
+
+      return response.data as string;
+    } catch (error) {
+      console.error('ファイルエクスポートエラー:', error);
+      throw new Error(
+        `ファイルエクスポートに失敗しました: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
 }

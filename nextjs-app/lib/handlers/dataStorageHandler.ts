@@ -623,4 +623,142 @@ export class DataStorageHandler {
       );
     }
   }
+
+  /**
+   * Google Driveからプロジェクト一覧を取得
+   */
+  async getProjectsFromDrive(): Promise<ClientInputData[]> {
+    try {
+      const folders = await this.driveService.listProjectFolders();
+      const projects: ClientInputData[] = [];
+
+      for (const folder of folders) {
+        try {
+          // フォルダ名から案件番号と商品名を抽出（形式: "2026-001_商品名"）
+          const folderNameParts = folder.name.split('_');
+          if (folderNameParts.length < 2) {
+            continue; // 形式が正しくない場合はスキップ
+          }
+
+          const projectNumber = folderNameParts[0];
+          const serviceName = folderNameParts.slice(1).join('_');
+
+          // フォルダ内のファイルを取得
+          const files = await this.driveService.listFilesInFolder(folder.id);
+          
+          // JSONファイルを探す（"01_クライアント事前入力.json" または類似のファイル）
+          const jsonFile = files.find((f: any) => 
+            f.name.includes('クライアント事前入力') && f.name.endsWith('.json')
+          );
+
+          if (jsonFile) {
+            try {
+              // JSONファイルの内容を読み込む
+              const jsonContent = await this.driveService.readDocument(jsonFile.id);
+              const projectData = JSON.parse(jsonContent) as ClientInputData;
+
+              // プロジェクトIDが存在しない場合は、案件番号から推測
+              if (!projectData.project_id) {
+                // 案件番号からプロジェクトIDを逆引き（簡易版）
+                // 実際の実装では、project_numbers.jsonと照合する必要がある
+                projectData.project_id = `project-${projectNumber}`;
+              }
+
+              // 基本情報を設定
+              if (!projectData.basic_info) {
+                projectData.basic_info = {
+                  service_name: serviceName,
+                } as any;
+              } else if (!projectData.basic_info.service_name) {
+                projectData.basic_info.service_name = serviceName;
+              }
+
+              // フォルダIDを設定
+              projectData.project_folder_id = folder.id;
+
+              // 作成日時と更新日時を設定
+              if (folder.createdTime) {
+                projectData.created_at = new Date(folder.createdTime).toISOString();
+              }
+              if (folder.modifiedTime) {
+                projectData.updated_at = new Date(folder.modifiedTime).toISOString();
+              }
+
+              projects.push(projectData);
+            } catch (parseError) {
+              console.error(`フォルダ ${folder.name} のJSONファイル解析エラー:`, parseError);
+              // JSONファイルが解析できない場合でも、基本情報だけは追加
+              const basicProject: ClientInputData = {
+                project_id: `project-${projectNumber}`,
+                basic_info: {
+                  service_name: serviceName,
+                } as any,
+                project_folder_id: folder.id,
+                created_at: folder.createdTime ? new Date(folder.createdTime).toISOString() : undefined,
+                updated_at: folder.modifiedTime ? new Date(folder.modifiedTime).toISOString() : undefined,
+              };
+              projects.push(basicProject);
+            }
+          } else {
+            // JSONファイルが見つからない場合でも、基本情報だけは追加
+            const basicProject: ClientInputData = {
+              project_id: `project-${projectNumber}`,
+              basic_info: {
+                service_name: serviceName,
+              } as any,
+              project_folder_id: folder.id,
+              created_at: folder.createdTime ? new Date(folder.createdTime).toISOString() : undefined,
+              updated_at: folder.modifiedTime ? new Date(folder.modifiedTime).toISOString() : undefined,
+            };
+            projects.push(basicProject);
+          }
+        } catch (error) {
+          console.error(`フォルダ ${folder.name} の処理エラー:`, error);
+          // エラーが発生しても続行
+        }
+      }
+
+      return projects;
+    } catch (error) {
+      console.error('Google Driveからプロジェクト一覧取得エラー:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Google Driveからプロジェクト詳細を取得
+   */
+  async getProjectFromDrive(projectId: string, projectFolderId: string): Promise<ClientInputData | null> {
+    try {
+      // フォルダ内のファイルを取得
+      const files = await this.driveService.listFilesInFolder(projectFolderId);
+      
+      // JSONファイルを探す
+      const jsonFile = files.find((f: any) => 
+        f.name.includes('クライアント事前入力') && f.name.endsWith('.json')
+      );
+
+      if (jsonFile) {
+        try {
+          // JSONファイルの内容を読み込む
+          const jsonContent = await this.driveService.readDocument(jsonFile.id);
+          const projectData = JSON.parse(jsonContent) as ClientInputData;
+
+          // プロジェクトIDとフォルダIDを設定
+          projectData.project_id = projectId;
+          projectData.project_folder_id = projectFolderId;
+
+          return projectData;
+        } catch (parseError) {
+          console.error('JSONファイル解析エラー:', parseError);
+          return null;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Google Driveからプロジェクト詳細取得エラー:', error);
+      return null;
+    }
+  }
 }
