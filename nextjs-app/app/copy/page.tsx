@@ -53,6 +53,60 @@ function CopyPageContent() {
     }
   }, [projectId]);
 
+  // コピーデータの検証と正規化
+  const validateAndNormalizeCopy = (copyData: any): LPCopy | null => {
+    if (!copyData) return null;
+
+    try {
+      // 基本的な構造を確認
+      if (!copyData.hero || !copyData.problem || !copyData.solution || !copyData.benefits || !copyData.cta) {
+        console.warn('[CopyPage] Invalid copy data structure:', copyData);
+        return null;
+      }
+
+      // 各セクションの必須フィールドを検証・補完
+      const normalized: LPCopy = {
+        hero: {
+          headline: copyData.hero?.headline || 'キャッチコピーを追加してください',
+          subheadline: copyData.hero?.subheadline || 'サブキャッチコピーを追加してください',
+          supportText: copyData.hero?.supportText || '補足説明を追加してください',
+        },
+        problem: {
+          title: copyData.problem?.title || '課題のタイトルを追加してください',
+          description: copyData.problem?.description || '課題の説明を追加してください',
+        },
+        solution: {
+          title: copyData.solution?.title || '解決策のタイトルを追加してください',
+          description: copyData.solution?.description || '解決策の説明を追加してください',
+        },
+        benefits: Array.isArray(copyData.benefits) && copyData.benefits.length > 0
+          ? copyData.benefits.map((b: any) => ({
+              title: b.title || 'メリットタイトル',
+              description: b.description || 'メリット説明',
+            }))
+          : [
+              { title: 'メリット1', description: '内容を追加してください' },
+              { title: 'メリット2', description: '内容を追加してください' },
+              { title: 'メリット3', description: '内容を追加してください' },
+            ],
+        socialProof: {
+          title: copyData.socialProof?.title || '実績・社会証明のタイトルを追加してください',
+          content: copyData.socialProof?.content || '実績・社会証明の内容を追加してください',
+        },
+        cta: {
+          primary: copyData.cta?.primary || 'CTAを追加してください',
+          secondary: copyData.cta?.secondary,
+        },
+        editingNotes: copyData.editingNotes,
+      };
+
+      return normalized;
+    } catch (error) {
+      console.error('[CopyPage] Error validating copy data:', error);
+      return null;
+    }
+  };
+
   const fetchProjectData = async () => {
     if (!projectId) return;
 
@@ -63,13 +117,37 @@ function CopyPageContent() {
         const data = await response.json();
         // 確定コピーを優先的に表示、なければ生成済みコピーを表示
         if (data.finalized_copy) {
-          setCopy(data.finalized_copy);
+          const normalizedCopy = validateAndNormalizeCopy(data.finalized_copy);
+          if (normalizedCopy) {
+            setCopy(normalizedCopy);
+          } else {
+            console.error('[CopyPage] Failed to validate finalized_copy:', data.finalized_copy);
+            setStatus({
+              type: 'error',
+              message: '確定コピーのデータ形式が正しくありません',
+            });
+          }
         } else if (data.generated_copy) {
-          setCopy(data.generated_copy);
+          const normalizedCopy = validateAndNormalizeCopy(data.generated_copy);
+          if (normalizedCopy) {
+            setCopy(normalizedCopy);
+          } else {
+            console.error('[CopyPage] Failed to validate generated_copy:', data.generated_copy);
+          }
         }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setStatus({
+          type: 'error',
+          message: errorData.message || 'プロジェクトデータの取得に失敗しました',
+        });
       }
     } catch (error) {
-      console.error('プロジェクトデータの取得エラー:', error);
+      console.error('[CopyPage] プロジェクトデータの取得エラー:', error);
+      setStatus({
+        type: 'error',
+        message: `サーバーとの通信に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -351,28 +429,28 @@ function CopyPageContent() {
               <div className="space-y-4">
                 {isEditing ? (
                   <>
-                    <InputField
-                      label="メインキャッチコピー"
-                      name="headline"
-                      value={copy.hero.headline}
-                      onChange={(value) => updateCopyField('hero', 'headline', value)}
-                      placeholder="メインキャッチコピーを入力"
-                    />
-                    <InputField
-                      label="サブキャッチコピー"
-                      name="subheadline"
-                      value={copy.hero.subheadline}
-                      onChange={(value) => updateCopyField('hero', 'subheadline', value)}
-                      placeholder="サブキャッチコピーを入力"
-                    />
-                    <TextareaField
-                      label="補足説明"
-                      name="supportText"
-                      value={copy.hero.supportText}
-                      onChange={(value) => updateCopyField('hero', 'supportText', value)}
-                      placeholder="補足説明を入力"
-                      rows={3}
-                    />
+                        <InputField
+                          label="メインキャッチコピー"
+                          name="headline"
+                          value={copy.hero?.headline || ''}
+                          onChange={(value) => updateCopyField('hero', 'headline', value)}
+                          placeholder="メインキャッチコピーを入力"
+                        />
+                        <InputField
+                          label="サブキャッチコピー"
+                          name="subheadline"
+                          value={copy.hero?.subheadline || ''}
+                          onChange={(value) => updateCopyField('hero', 'subheadline', value)}
+                          placeholder="サブキャッチコピーを入力"
+                        />
+                        <TextareaField
+                          label="補足説明"
+                          name="supportText"
+                          value={copy.hero?.supportText || ''}
+                          onChange={(value) => updateCopyField('hero', 'supportText', value)}
+                          placeholder="補足説明を入力"
+                          rows={3}
+                        />
                   </>
                 ) : (
                   <>
@@ -380,19 +458,19 @@ function CopyPageContent() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         メインキャッチコピー
                       </label>
-                      <p className="text-lg font-semibold text-gray-900">{copy.hero.headline}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        サブキャッチコピー
-                      </label>
-                      <p className="text-base text-gray-800">{copy.hero.subheadline}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        補足説明
-                      </label>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{copy.hero.supportText}</p>
+                          <p className="text-lg font-semibold text-gray-900">{copy.hero?.headline || '未設定'}</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            サブキャッチコピー
+                          </label>
+                          <p className="text-base text-gray-800">{copy.hero?.subheadline || '未設定'}</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            補足説明
+                          </label>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{copy.hero?.supportText || '未設定'}</p>
                     </div>
                   </>
                 )}
@@ -408,14 +486,14 @@ function CopyPageContent() {
                     <InputField
                       label="タイトル"
                       name="problemTitle"
-                      value={copy.problem.title}
+                      value={copy.problem?.title || ''}
                       onChange={(value) => updateCopyField('problem', 'title', value)}
                       placeholder="課題セクションのタイトル"
                     />
                     <TextareaField
                       label="説明"
                       name="problemDescription"
-                      value={copy.problem.description}
+                      value={copy.problem?.description || ''}
                       onChange={(value) => updateCopyField('problem', 'description', value)}
                       placeholder="ターゲットの課題を具体的に説明"
                       rows={4}
@@ -425,11 +503,11 @@ function CopyPageContent() {
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">タイトル</label>
-                      <p className="text-lg font-semibold text-gray-900">{copy.problem.title}</p>
+                      <p className="text-lg font-semibold text-gray-900">{copy.problem?.title || '未設定'}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">説明</label>
-                      <p className="text-gray-700 whitespace-pre-wrap">{copy.problem.description}</p>
+                      <p className="text-gray-700 whitespace-pre-wrap">{copy.problem?.description || '未設定'}</p>
                     </div>
                   </>
                 )}
@@ -445,14 +523,14 @@ function CopyPageContent() {
                     <InputField
                       label="タイトル"
                       name="solutionTitle"
-                      value={copy.solution.title}
+                      value={copy.solution?.title || ''}
                       onChange={(value) => updateCopyField('solution', 'title', value)}
                       placeholder="解決策セクションのタイトル"
                     />
                     <TextareaField
                       label="説明"
                       name="solutionDescription"
-                      value={copy.solution.description}
+                      value={copy.solution?.description || ''}
                       onChange={(value) => updateCopyField('solution', 'description', value)}
                       placeholder="サービスが提供する解決策を説明"
                       rows={4}
@@ -462,11 +540,11 @@ function CopyPageContent() {
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">タイトル</label>
-                      <p className="text-lg font-semibold text-gray-900">{copy.solution.title}</p>
+                      <p className="text-lg font-semibold text-gray-900">{copy.solution?.title || '未設定'}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">説明</label>
-                      <p className="text-gray-700 whitespace-pre-wrap">{copy.solution.description}</p>
+                      <p className="text-gray-700 whitespace-pre-wrap">{copy.solution?.description || '未設定'}</p>
                     </div>
                   </>
                 )}
@@ -477,7 +555,7 @@ function CopyPageContent() {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Benefitsセクション</h2>
               <div className="space-y-4">
-                {copy.benefits.map((benefit, index) => (
+                {(copy.benefits || []).map((benefit, index) => (
                   <div key={index} className="border-l-4 border-blue-500 pl-4">
                     {isEditing ? (
                       <>
@@ -517,14 +595,14 @@ function CopyPageContent() {
                     <InputField
                       label="タイトル"
                       name="socialProofTitle"
-                      value={copy.socialProof.title}
+                      value={copy.socialProof?.title || ''}
                       onChange={(value) => updateCopyField('socialProof', 'title', value)}
                       placeholder="実績・社会証明のタイトル"
                     />
                     <TextareaField
                       label="内容"
                       name="socialProofContent"
-                      value={copy.socialProof.content}
+                      value={copy.socialProof?.content || ''}
                       onChange={(value) => updateCopyField('socialProof', 'content', value)}
                       placeholder="実績やお客様の声を記載"
                       rows={4}
@@ -534,11 +612,11 @@ function CopyPageContent() {
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">タイトル</label>
-                      <p className="text-lg font-semibold text-gray-900">{copy.socialProof.title}</p>
+                      <p className="text-lg font-semibold text-gray-900">{copy.socialProof?.title || '未設定'}</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">内容</label>
-                      <p className="text-gray-700 whitespace-pre-wrap">{copy.socialProof.content}</p>
+                      <p className="text-gray-700 whitespace-pre-wrap">{copy.socialProof?.content || '未設定'}</p>
                     </div>
                   </>
                 )}
@@ -554,7 +632,7 @@ function CopyPageContent() {
                     <InputField
                       label="メインCTA"
                       name="ctaPrimary"
-                      value={copy.cta.primary}
+                      value={copy.cta?.primary || ''}
                       onChange={(value) => updateCopyField('cta', 'primary', value)}
                       placeholder="メインCTA（例: 今すぐ無料で始める）"
                     />
@@ -562,7 +640,7 @@ function CopyPageContent() {
                       label="サブCTA"
                       name="ctaSecondary"
                       optional
-                      value={copy.cta.secondary || ''}
+                      value={copy.cta?.secondary || ''}
                       onChange={(value) => updateCopyField('cta', 'secondary', value)}
                       placeholder="サブCTA（任意）"
                     />
@@ -573,9 +651,9 @@ function CopyPageContent() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         メインCTA
                       </label>
-                      <p className="text-lg font-semibold text-blue-600">{copy.cta.primary}</p>
+                      <p className="text-lg font-semibold text-blue-600">{copy.cta?.primary || '未設定'}</p>
                     </div>
-                    {copy.cta.secondary && (
+                    {copy.cta?.secondary && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           サブCTA
