@@ -97,19 +97,33 @@ function DesignerPageContent() {
     setIsLoading(true);
     try {
       const response = await fetch('/api/client-input/list');
-      if (response.ok) {
-        const data = await response.json();
-        setProjects(data);
-      } else {
+      
+      if (!response.ok) {
+        // レスポンスがエラーの場合、JSONをパースしてエラーメッセージを取得
+        let errorMessage = 'プロジェクト一覧の取得に失敗しました';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          // JSONパースに失敗した場合は、ステータステキストを使用
+          errorMessage = response.statusText || errorMessage;
+        }
+        console.error('[DesignerPage] API error:', response.status, errorMessage);
         setStatus({
           type: 'error',
-          message: 'プロジェクト一覧の取得に失敗しました',
+          message: errorMessage,
         });
+        return;
       }
+      
+      const data = await response.json();
+      setProjects(data || []);
     } catch (error) {
+      console.error('[DesignerPage] Fetch error:', error);
+      console.error('[DesignerPage] Error details:', error instanceof Error ? error.stack : String(error));
       setStatus({
         type: 'error',
-        message: 'サーバーとの通信に失敗しました',
+        message: `サーバーとの通信に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
       });
     } finally {
       setIsLoading(false);
@@ -121,35 +135,47 @@ function DesignerPageContent() {
     setStatus({ type: null, message: '' });
     try {
       const response = await fetch(`/api/client-input/${projectId}`);
-      const data = await response.json();
       
-      if (response.ok) {
-        // データが正しく取得できたか確認
-        if (data && (data.basicInfo || data.project_id)) {
-          setFormData(data);
-          setErrors({}); // データ読み込み時はエラーをクリア
-        } else {
-          console.error('Invalid data format:', data);
-          setStatus({
-            type: 'error',
-            message: 'プロジェクトデータの形式が正しくありません',
-          });
-          setIsLoading(false);
+      if (!response.ok) {
+        // レスポンスがエラーの場合、JSONをパースしてエラーメッセージを取得
+        let errorMessage = 'プロジェクト詳細の取得に失敗しました';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          // JSONパースに失敗した場合は、ステータステキストを使用
+          errorMessage = response.statusText || errorMessage;
         }
-      } else {
-        console.error('API error:', data);
+        console.error('[DesignerPage] API error:', response.status, errorMessage);
         setStatus({
           type: 'error',
-          message: data.message || 'プロジェクト詳細の取得に失敗しました',
+          message: errorMessage,
         });
         setIsLoading(false);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      // データが正しく取得できたか確認
+      if (data && (data.basicInfo || data.project_id)) {
+        setFormData(data);
+        setErrors({}); // データ読み込み時はエラーをクリア
+      } else {
+        console.error('[DesignerPage] Invalid data format:', data);
+        setStatus({
+          type: 'error',
+          message: 'プロジェクトデータの形式が正しくありません',
+        });
       }
     } catch (error) {
-      console.error('Fetch error:', error);
+      console.error('[DesignerPage] Fetch error:', error);
+      console.error('[DesignerPage] Error details:', error instanceof Error ? error.stack : String(error));
       setStatus({
         type: 'error',
         message: `サーバーとの通信に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
       });
+    } finally {
       setIsLoading(false);
     }
   };

@@ -48,7 +48,8 @@ export async function GET(
           }
         } catch (driveError) {
           console.error('[API] Error fetching from Google Drive:', driveError);
-          // Google Driveのエラーは無視
+          console.error('[API] Drive error details:', driveError instanceof Error ? driveError.stack : String(driveError));
+          // Google Driveのエラーは無視（一時保存のデータがない場合は404を返す）
         }
       }
     } else {
@@ -72,6 +73,7 @@ export async function GET(
             }
           } catch (driveError) {
             console.error('[API] Error fetching from Google Drive:', driveError);
+            console.error('[API] Drive error details:', driveError instanceof Error ? driveError.stack : String(driveError));
             // Google Driveのエラーは無視して、一時保存のデータを使用
           }
         }
@@ -79,21 +81,34 @@ export async function GET(
     }
     
     if (inputData) {
-      const convertedData = convertBackendToFrontend(inputData);
-      return NextResponse.json({
-        ...convertedData,
-        project_id: inputData.project_id,
-        created_at: inputData.created_at,
-        updated_at: inputData.updated_at,
-        project_folder_id: inputData.project_folder_id,
-        // AI分析結果と質問も含める（変換関数で処理されない場合のフォールバック）
-        ...(inputData.ai_analysis && { aiAnalysis: inputData.ai_analysis }),
-        ...(inputData.ai_questions && { aiQuestions: inputData.ai_questions }),
-        // 確定コピーとデザイン指示も含める
-        ...(inputData.finalized_copy && { finalized_copy: inputData.finalized_copy }),
-        ...(inputData.design_instruction && { design_instruction: inputData.design_instruction }),
-        ...(inputData.finalized_design_instruction && { finalized_design_instruction: inputData.finalized_design_instruction }),
-      }, { status: 200 });
+      try {
+        const convertedData = convertBackendToFrontend(inputData);
+        return NextResponse.json({
+          ...convertedData,
+          project_id: inputData.project_id,
+          created_at: inputData.created_at,
+          updated_at: inputData.updated_at,
+          project_folder_id: inputData.project_folder_id,
+          // AI分析結果と質問も含める（変換関数で処理されない場合のフォールバック）
+          ...(inputData.ai_analysis && { aiAnalysis: inputData.ai_analysis }),
+          ...(inputData.ai_questions && { aiQuestions: inputData.ai_questions }),
+          // 確定コピーとデザイン指示も含める
+          ...(inputData.finalized_copy && { finalized_copy: inputData.finalized_copy }),
+          ...(inputData.design_instruction && { design_instruction: inputData.design_instruction }),
+          ...(inputData.finalized_design_instruction && { finalized_design_instruction: inputData.finalized_design_instruction }),
+        }, { status: 200 });
+      } catch (convertError) {
+        console.error('[API] Error converting data:', convertError);
+        console.error('[API] Convert error details:', convertError instanceof Error ? convertError.stack : String(convertError));
+        return NextResponse.json(
+          {
+            success: false,
+            message: `データの変換に失敗しました: ${convertError instanceof Error ? convertError.message : String(convertError)}`,
+            errors: [convertError instanceof Error ? convertError.message : String(convertError)],
+          },
+          { status: 500 }
+        );
+      }
     } else {
       return NextResponse.json(
         {
