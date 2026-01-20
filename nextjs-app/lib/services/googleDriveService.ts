@@ -305,15 +305,20 @@ export class GoogleDriveService {
   /**
    * フォルダ内のファイル一覧を取得
    */
-  async listFilesInFolder(folderId: string): Promise<Array<{ id: string; name: string; mimeType: string }>> {
+  async listFilesInFolder(folderId: string): Promise<Array<{ id: string; name: string; mimeType: string; modifiedTime?: string }>> {
     try {
       const response = await this.drive.files.list({
         q: `'${folderId}' in parents and trashed=false`,
-        fields: 'files(id, name, mimeType)',
+        fields: 'files(id, name, mimeType, modifiedTime)',
         pageSize: 100,
       });
 
-      return response.data.files || [];
+      return (response.data.files || []).map((file: any) => ({
+        id: file.id,
+        name: file.name,
+        mimeType: file.mimeType,
+        modifiedTime: file.modifiedTime,
+      }));
     } catch (error) {
       console.error('ファイル一覧取得エラー:', error);
       throw new Error(

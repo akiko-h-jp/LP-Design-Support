@@ -753,39 +753,99 @@ export class DataStorageHandler {
     try {
       // フォルダ内のファイルを取得
       const files = await this.driveService.listFilesInFolder(projectFolderId);
+      console.log(`[DataStorageHandler] Folder contains ${files.length} files:`, files.map((f: any) => f.name).join(', '));
       
-      // JSONファイルを探す
-      const jsonFile = files.find((f: any) => 
+      // 基本データ（クライアント事前入力）のJSONファイルを探す
+      const clientInputFile = files.find((f: any) => 
         f.name.includes('クライアント事前入力') && f.name.endsWith('.json')
       );
 
-      if (jsonFile) {
+      // 確定コピーのJSONファイルを探す
+      const copyFile = files.find((f: any) => 
+        (f.name.includes('確定コピー') || f.name.includes('02_')) && f.name.endsWith('.json')
+      );
+
+      // 確定デザイン指示のJSONファイルを探す
+      const designInstructionFile = files.find((f: any) => 
+        (f.name.includes('デザイン指示') || f.name.includes('04_')) && f.name.endsWith('.json')
+      );
+
+      let projectData: ClientInputData | null = null;
+
+      // 基本データを読み込む
+      if (clientInputFile) {
         try {
-          // JSONファイルの内容を読み込む（Google Docsファイルとして保存されている場合はエクスポート）
           let jsonContent: string;
-          if (jsonFile.mimeType === 'application/vnd.google-apps.document') {
-            // Google Docsファイルの場合はエクスポート
-            jsonContent = await this.driveService.exportFile(jsonFile.id, 'text/plain');
+          if (clientInputFile.mimeType === 'application/vnd.google-apps.document') {
+            jsonContent = await this.driveService.exportFile(clientInputFile.id, 'text/plain');
           } else {
-            // 通常のファイルの場合は直接読み込み
-            jsonContent = await this.driveService.readDocument(jsonFile.id);
+            jsonContent = await this.driveService.readDocument(clientInputFile.id);
           }
-          const projectData = JSON.parse(jsonContent) as ClientInputData;
-
-          // プロジェクトIDとフォルダIDを設定
-          projectData.project_id = projectId;
-          projectData.project_folder_id = projectFolderId;
-
-          return projectData;
+          projectData = JSON.parse(jsonContent) as ClientInputData;
+          console.log('[DataStorageHandler] Loaded client input data');
         } catch (parseError) {
-          console.error('JSONファイル解析エラー:', parseError);
-          return null;
+          console.error('[DataStorageHandler] Client input JSONファイル解析エラー:', parseError);
         }
       }
 
-      return null;
+      // プロジェクトデータが存在しない場合は、空のオブジェクトを作成
+      if (!projectData) {
+        projectData = {
+          project_id: projectId,
+          project_folder_id: projectFolderId,
+        };
+      }
+
+      // 確定コピーを読み込む
+      if (copyFile) {
+        try {
+          let jsonContent: string;
+          if (copyFile.mimeType === 'application/vnd.google-apps.document') {
+            jsonContent = await this.driveService.exportFile(copyFile.id, 'text/plain');
+          } else {
+            jsonContent = await this.driveService.readDocument(copyFile.id);
+          }
+          const copyData = JSON.parse(jsonContent);
+          projectData.finalized_copy = copyData;
+          // ファイルの更新日時を取得
+          if (copyFile.modifiedTime) {
+            projectData.finalized_copy_at = new Date(copyFile.modifiedTime).toISOString();
+          }
+          console.log('[DataStorageHandler] Loaded finalized copy');
+        } catch (parseError) {
+          console.error('[DataStorageHandler] Copy JSONファイル解析エラー:', parseError);
+        }
+      }
+
+      // 確定デザイン指示を読み込む
+      if (designInstructionFile) {
+        try {
+          let jsonContent: string;
+          if (designInstructionFile.mimeType === 'application/vnd.google-apps.document') {
+            jsonContent = await this.driveService.exportFile(designInstructionFile.id, 'text/plain');
+          } else {
+            jsonContent = await this.driveService.readDocument(designInstructionFile.id);
+          }
+          const instructionData = JSON.parse(jsonContent);
+          projectData.finalized_design_instruction = instructionData;
+          // ファイルの更新日時を取得
+          if (designInstructionFile.modifiedTime) {
+            projectData.finalized_design_instruction_at = new Date(designInstructionFile.modifiedTime).toISOString();
+          }
+          console.log('[DataStorageHandler] Loaded finalized design instruction');
+        } catch (parseError) {
+          console.error('[DataStorageHandler] Design instruction JSONファイル解析エラー:', parseError);
+        }
+      }
+
+      // プロジェクトIDとフォルダIDを設定
+      projectData.project_id = projectId;
+      projectData.project_folder_id = projectFolderId;
+
+      return projectData;
     } catch (error) {
-      console.error('Google Driveからプロジェクト詳細取得エラー:', error);
+      console.error('[DataStorageHandler] Google Driveからプロジェクト詳細取得エラー:', error);
+      console.error('[DataStorageHandler] Error details:', error instanceof Error ? error.stack : String(error));
       return null;
     }
   }
