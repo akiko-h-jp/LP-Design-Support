@@ -4,7 +4,16 @@ import { DataStorageHandler } from '@/lib/handlers/dataStorageHandler';
 import { convertFrontendToBackend, convertBackendToFrontend } from '@/lib/utils/formatConverter';
 
 const handler = new ClientInputHandler();
-const dataStorageHandler = new DataStorageHandler();
+
+// DataStorageHandlerは必要になったときに初期化（Google Drive APIの認証エラーを避けるため）
+function getDataStorageHandler(): DataStorageHandler | null {
+  try {
+    return new DataStorageHandler();
+  } catch (error) {
+    console.error('DataStorageHandler初期化エラー:', error);
+    return null;
+  }
+}
 
 export async function GET(
   request: NextRequest,
@@ -19,46 +28,52 @@ export async function GET(
     
     // 一時保存にデータがない場合、Google Driveから取得を試みる
     if (!inputData) {
-      try {
-        // プロジェクト一覧から該当するプロジェクトを探す
-        const driveProjects = await dataStorageHandler.getProjectsFromDrive();
-        const driveProject = driveProjects.find((p) => p.project_id === projectId);
-        
-        if (driveProject && driveProject.project_folder_id) {
-          // Google Driveから詳細データを取得
-          const driveData = await dataStorageHandler.getProjectFromDrive(
-            projectId,
-            driveProject.project_folder_id
-          );
+      const storageHandler = getDataStorageHandler();
+      if (storageHandler) {
+        try {
+          // プロジェクト一覧から該当するプロジェクトを探す
+          const driveProjects = await storageHandler.getProjectsFromDrive();
+          const driveProject = driveProjects.find((p) => p.project_id === projectId);
           
-          if (driveData) {
-            inputData = driveData;
+          if (driveProject && driveProject.project_folder_id) {
+            // Google Driveから詳細データを取得
+            const driveData = await storageHandler.getProjectFromDrive(
+              projectId,
+              driveProject.project_folder_id
+            );
+            
+            if (driveData) {
+              inputData = driveData;
+            }
           }
+        } catch (driveError) {
+          console.error('[API] Error fetching from Google Drive:', driveError);
+          // Google Driveのエラーは無視
         }
-      } catch (driveError) {
-        console.error('[API] Error fetching from Google Drive:', driveError);
-        // Google Driveのエラーは無視
       }
     } else {
       // 一時保存にデータがある場合でも、Google Driveから最新データを取得してマージ
       if (inputData.project_folder_id) {
-        try {
-          const driveData = await dataStorageHandler.getProjectFromDrive(
-            projectId,
-            inputData.project_folder_id
-          );
-          
-          if (driveData) {
-            // Google Driveのデータを優先してマージ
-            inputData = {
-              ...inputData,
-              ...driveData,
-              project_id: projectId, // project_idは確実に設定
-            };
+        const storageHandler = getDataStorageHandler();
+        if (storageHandler) {
+          try {
+            const driveData = await storageHandler.getProjectFromDrive(
+              projectId,
+              inputData.project_folder_id
+            );
+            
+            if (driveData) {
+              // Google Driveのデータを優先してマージ
+              inputData = {
+                ...inputData,
+                ...driveData,
+                project_id: projectId, // project_idは確実に設定
+              };
+            }
+          } catch (driveError) {
+            console.error('[API] Error fetching from Google Drive:', driveError);
+            // Google Driveのエラーは無視して、一時保存のデータを使用
           }
-        } catch (driveError) {
-          console.error('[API] Error fetching from Google Drive:', driveError);
-          // Google Driveのエラーは無視して、一時保存のデータを使用
         }
       }
     }

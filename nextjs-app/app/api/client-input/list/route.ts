@@ -5,8 +5,17 @@ import { convertBackendToFrontend } from '@/lib/utils/formatConverter';
 import { ProjectNumberManager } from '@/lib/utils/projectNumberManager';
 
 const handler = new ClientInputHandler();
-const dataStorageHandler = new DataStorageHandler();
 const projectNumberManager = new ProjectNumberManager();
+
+// DataStorageHandlerは必要になったときに初期化（Google Drive APIの認証エラーを避けるため）
+function getDataStorageHandler(): DataStorageHandler | null {
+  try {
+    return new DataStorageHandler();
+  } catch (error) {
+    console.error('DataStorageHandler初期化エラー:', error);
+    return null;
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,11 +24,14 @@ export async function GET(request: NextRequest) {
     
     // Google Driveからデータを取得
     let driveInputs: any[] = [];
-    try {
-      driveInputs = await dataStorageHandler.getProjectsFromDrive();
-    } catch (driveError) {
-      console.error('[API] Error fetching from Google Drive:', driveError);
-      // Google Driveのエラーは無視して、一時保存のデータだけを返す
+    const storageHandler = getDataStorageHandler();
+    if (storageHandler) {
+      try {
+        driveInputs = await storageHandler.getProjectsFromDrive();
+      } catch (driveError) {
+        console.error('[API] Error fetching from Google Drive:', driveError);
+        // Google Driveのエラーは無視して、一時保存のデータだけを返す
+      }
     }
 
     // プロジェクトIDをキーにして統合（Google Driveのデータを優先）
