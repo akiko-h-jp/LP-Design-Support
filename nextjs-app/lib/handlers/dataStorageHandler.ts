@@ -629,7 +629,9 @@ export class DataStorageHandler {
    */
   async getProjectsFromDrive(): Promise<ClientInputData[]> {
     try {
+      console.log('[DataStorageHandler] Fetching project folders from Google Drive...');
       const folders = await this.driveService.listProjectFolders();
+      console.log(`[DataStorageHandler] Found ${folders.length} folders`);
       const projects: ClientInputData[] = [];
 
       for (const folder of folders) {
@@ -725,9 +727,11 @@ export class DataStorageHandler {
         }
       }
 
+      console.log(`[DataStorageHandler] Returning ${projects.length} projects`);
       return projects;
     } catch (error) {
-      console.error('Google Driveからプロジェクト一覧取得エラー:', error);
+      console.error('[DataStorageHandler] Google Driveからプロジェクト一覧取得エラー:', error);
+      console.error('[DataStorageHandler] Error details:', error instanceof Error ? error.stack : String(error));
       return [];
     }
   }

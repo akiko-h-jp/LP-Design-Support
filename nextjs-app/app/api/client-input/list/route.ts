@@ -19,19 +19,26 @@ function getDataStorageHandler(): DataStorageHandler | null {
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('[API] Fetching project list...');
     // 一時保存のデータを取得
     const tempInputs = await handler.getAllInputs();
+    console.log(`[API] Found ${tempInputs.length} projects from temp storage`);
     
     // Google Driveからデータを取得
     let driveInputs: any[] = [];
     const storageHandler = getDataStorageHandler();
     if (storageHandler) {
       try {
+        console.log('[API] Fetching projects from Google Drive...');
         driveInputs = await storageHandler.getProjectsFromDrive();
+        console.log(`[API] Found ${driveInputs.length} projects from Google Drive`);
       } catch (driveError) {
         console.error('[API] Error fetching from Google Drive:', driveError);
+        console.error('[API] Error details:', driveError instanceof Error ? driveError.stack : String(driveError));
         // Google Driveのエラーは無視して、一時保存のデータだけを返す
       }
+    } else {
+      console.log('[API] DataStorageHandler could not be initialized (Google Drive credentials may be missing)');
     }
 
     // プロジェクトIDをキーにして統合（Google Driveのデータを優先）
@@ -90,6 +97,7 @@ export async function GET(request: NextRequest) {
       return dateB - dateA; // 新しい順
     });
 
+    console.log(`[API] Returning ${convertedInputs.length} total projects`);
     return NextResponse.json(convertedInputs, { status: 200 });
   } catch (error) {
     console.error('[API] Error in list endpoint:', error);
