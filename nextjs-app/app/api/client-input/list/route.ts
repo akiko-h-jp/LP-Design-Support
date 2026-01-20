@@ -10,9 +10,24 @@ const projectNumberManager = new ProjectNumberManager();
 // DataStorageHandlerは必要になったときに初期化（Google Drive APIの認証エラーを避けるため）
 function getDataStorageHandler(): DataStorageHandler | null {
   try {
+    // 環境変数の確認
+    const hasCredentials = !!process.env.GOOGLE_DRIVE_CREDENTIALS_JSON || !!process.env.GOOGLE_DRIVE_CREDENTIALS_PATH;
+    const hasFolderId = !!process.env.GOOGLE_DRIVE_FOLDER_ID;
+    
+    if (!hasCredentials) {
+      console.log('[API] Google Drive credentials not configured, skipping Google Drive fetch');
+      return null;
+    }
+    
+    if (!hasFolderId) {
+      console.log('[API] GOOGLE_DRIVE_FOLDER_ID not configured, skipping Google Drive fetch');
+      return null;
+    }
+    
     return new DataStorageHandler();
   } catch (error) {
-    console.error('DataStorageHandler初期化エラー:', error);
+    console.error('[API] DataStorageHandler初期化エラー:', error);
+    console.error('[API] Error details:', error instanceof Error ? error.stack : String(error));
     return null;
   }
 }
@@ -34,11 +49,15 @@ export async function GET(request: NextRequest) {
         console.log(`[API] Found ${driveInputs.length} projects from Google Drive`);
       } catch (driveError) {
         console.error('[API] Error fetching from Google Drive:', driveError);
-        console.error('[API] Error details:', driveError instanceof Error ? driveError.stack : String(driveError));
+        console.error('[API] Error type:', driveError instanceof Error ? driveError.constructor.name : typeof driveError);
+        console.error('[API] Error message:', driveError instanceof Error ? driveError.message : String(driveError));
+        console.error('[API] Error stack:', driveError instanceof Error ? driveError.stack : 'No stack trace');
         // Google Driveのエラーは無視して、一時保存のデータだけを返す
       }
     } else {
       console.log('[API] DataStorageHandler could not be initialized (Google Drive credentials may be missing)');
+      console.log('[API] GOOGLE_DRIVE_CREDENTIALS_JSON:', process.env.GOOGLE_DRIVE_CREDENTIALS_JSON ? 'Set' : 'Not set');
+      console.log('[API] GOOGLE_DRIVE_FOLDER_ID:', process.env.GOOGLE_DRIVE_FOLDER_ID ? 'Set' : 'Not set');
     }
 
     // プロジェクトIDをキーにして統合（Google Driveのデータを優先）

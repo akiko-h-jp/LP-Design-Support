@@ -630,8 +630,12 @@ export class DataStorageHandler {
   async getProjectsFromDrive(): Promise<ClientInputData[]> {
     try {
       console.log('[DataStorageHandler] Fetching project folders from Google Drive...');
+      console.log('[DataStorageHandler] Root folder ID:', this.rootFolderId || 'Not set');
       const folders = await this.driveService.listProjectFolders();
       console.log(`[DataStorageHandler] Found ${folders.length} folders`);
+      if (folders.length > 0) {
+        console.log('[DataStorageHandler] Folder names:', folders.map((f: any) => f.name).join(', '));
+      }
       const projects: ClientInputData[] = [];
 
       for (const folder of folders) {
@@ -647,11 +651,17 @@ export class DataStorageHandler {
 
           // フォルダ内のファイルを取得
           const files = await this.driveService.listFilesInFolder(folder.id);
+          console.log(`[DataStorageHandler] Folder ${folder.name} contains ${files.length} files`);
           
           // JSONファイルを探す（"01_クライアント事前入力.json" または類似のファイル）
           const jsonFile = files.find((f: any) => 
             f.name.includes('クライアント事前入力') && f.name.endsWith('.json')
           );
+          
+          if (!jsonFile) {
+            console.log(`[DataStorageHandler] No JSON file found in folder ${folder.name}`);
+            console.log(`[DataStorageHandler] Available files:`, files.map((f: any) => f.name).join(', '));
+          }
 
           if (jsonFile) {
             try {
